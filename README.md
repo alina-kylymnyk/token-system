@@ -533,30 +533,6 @@ pytest tests/ -v --tb=short
 - [Pydantic Documentation](https://docs.pydantic.dev/)
 - [Redis Documentation](https://redis.io/docs/)
 
----
-
-## 📄 Ліцензія
-
-MIT License - див. [LICENSE](LICENSE) файл
-
----
-
-## 👥 Автори
-
-- **Your Name** - [GitHub](https://github.com/yourusername)
-
----
-
-## 🤝 Contribution
-
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
----
-
-## 📧 Контакти
-
-- Email: support@example.com
-- Issues: [GitHub Issues](https://github.com/your-org/credits-system/issues)
 
 
 
