@@ -1,3 +1,12 @@
+import sys
+import os
+from pathlib import Path
+
+# Add project root to Python path and change working directory
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+os.chdir(project_root)
+
 from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
 from app.db.models import SubscriptionPlan, SystemSettings, SubscriptionTier

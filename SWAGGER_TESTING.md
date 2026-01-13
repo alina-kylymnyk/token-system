@@ -63,8 +63,21 @@ docker-compose up -d
 
 ### 4. Виконайте seed даних (опціонально)
 
+Seed скрипт можна запустити кількома способами:
+
+**Спосіб 1 (рекомендований):**
+```bash
+python -m app.db.seed
+```
+
+**Спосіб 2:**
 ```bash
 python app/db/seed.py
+```
+
+**Спосіб 3 (з будь-якої директорії):**
+```bash
+python3 app/db/seed.py
 ```
 
 ### 5. Запустіть API
@@ -478,6 +491,26 @@ print("Admin Token:", secrets.token_urlsafe(32))
 1. Перевірте, що API запущено: `curl http://localhost:8000/health`
 2. Перевірте, що порт 8000 вільний: `lsof -i :8000`
 3. Спробуйте інший порт: `uvicorn main:app --port 8001`
+
+### Проблема: ModuleNotFoundError: No module named 'app'
+
+**Причина:** Python не може знайти модуль app при запуску seed.py
+
+**Рішення:**
+Використовуйте один з наступних способів запуску:
+
+```bash
+# Спосіб 1 (як модуль Python - рекомендований)
+python -m app.db.seed
+
+# Спосіб 2 (з кореневої директорії проекту)
+python app/db/seed.py
+
+# Спосіб 3 (якщо ви в директорії app/db)
+python3 seed.py
+```
+
+Скрипт тепер автоматично знаходить кореневу директорію проекту та файл `.env`.
 
 ---
 
