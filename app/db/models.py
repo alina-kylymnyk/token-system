@@ -105,7 +105,6 @@ class CreditBalance(Base):
         CheckConstraint('balance >= 0', name='check_balance_non_negative'),
         CheckConstraint('total_earned >= 0', name='check_total_earned_non_negative'),
         CheckConstraint('total_spent >= 0', name='check_total_spent_non_negative'),
-        Index('ix_credit_balances_user_id', 'user_id'),
     )
     
     def __repr__(self):
@@ -140,8 +139,6 @@ class Transaction(Base):
     __table_args__ = (
         CheckConstraint('balance_after >= 0', name='check_balance_after_non_negative'),
         Index('ix_transactions_user_created', 'user_id', 'created_at'),
-        Index('ix_transactions_type', 'type'),
-        Index('ix_transactions_operation_id', 'operation_id'),
     )
     
     def __repr__(self):
