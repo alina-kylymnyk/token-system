@@ -2,7 +2,7 @@
 
 Повнофункціональна система управління кредитами та підписками для AI-генерації документів з підтримкою ідемпотентності, транзакційності та кешування.
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)
 ![Redis](https://img.shields.io/badge/Redis-7+-red.svg)
