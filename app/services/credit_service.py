@@ -81,7 +81,7 @@ class CreditService:
     @staticmethod
     def check_sufficient_credits(
         user_id: str,
-        required_credits: int, 
+        required_credits: int,
         db: Session
     ) -> CreditCheckResponse:
         """
@@ -94,7 +94,17 @@ class CreditService:
 
         Returns:
             CreditCheckResponse
+
+        Raises:
+            ValueError: If user not found
         """
+        # First check if user exists (consistent with get_balance behavior)
+        user = db.query(User).filter(User.user_id == user_id).first()
+
+        if not user:
+            raise ValueError(f"User not found: {user_id}")
+
+        # Try to get balance from cache
         cached_balance = cache_service.get_cached_balance(user_id)
 
         if cached_balance is not None:
@@ -104,22 +114,11 @@ class CreditService:
                 CreditBalance.user_id == user_id
             ).first()
 
-            if not credit_balance:
-                return CreditCheckResponse(
-                    user_id=user_id,
-                    has_subscription=False,
-                    subscription_tier=None,
-                    balance=0,
-                    sufficient=False,
-                    multiplier=None
-                )
-        
-            balance =  credit_balance.balance
+            balance = credit_balance.balance if credit_balance else 0
             cache_service.cache_balance(user_id, balance)
 
-        user = db.query(User).filter(User.user_id == user_id).first()
-
-        if not user or not user.subscription_tier:
+        # User exists but has no subscription
+        if not user.subscription_tier:
             return CreditCheckResponse(
                 user_id=user_id,
                 has_subscription=False,
@@ -280,9 +279,8 @@ class CreditService:
         """
         from app.services.transaction_service import TransactionService
 
-        # Idempotence check
-        existing_transaction = idempotency_manager.check_operation(operation_id, db)
-
+        # Idempotence check (with user_id to prevent Idempotency Hijacking)
+        existing_transaction = idempotency_manager.check_operation(operation_id, db, user_id=user_id)
 
         if existing_transaction:
             logger.info(f"Idempotent charge operation: {operation_id}")
@@ -299,15 +297,15 @@ class CreditService:
         
         try:
             with atomic_transaction(db):
-            # Get the user
+                # Get the user
                 user = db.query(User).filter(User.user_id == user_id).first()
 
                 if not user:
                     raise ValueError(f"User not found: {user_id}")
-                
+
                 if not user.subscription_tier:
                     raise ValueError(f"User has no subscription: {user_id}")
-                
+
                 # Calculate credits for charging
                 credits_to_charge, multiplier = CreditService.calculate_credits_to_charge(
                     cost_usd=cost_usd,
@@ -315,64 +313,62 @@ class CreditService:
                     db=db
                 )
 
-            with pessimistic_lock(db, CreditBalance, CreditBalance.user_id == user_id) as credit_balance:
-            
-                if not credit_balance:
-                    # Create balance if it doesn't exist
-                    credit_balance = CreditBalance(
+                with pessimistic_lock(db, CreditBalance, CreditBalance.user_id == user_id) as credit_balance:
+
+                    if not credit_balance:
+                        # Create balance if it doesn't exist
+                        credit_balance = CreditBalance(
+                            user_id=user_id,
+                            balance=0,
+                            total_earned=0,
+                            total_spent=0
+                        )
+                        db.add(credit_balance)
+                        db.flush()
+
+                    balance_before = credit_balance.balance
+
+                    if credit_balance.balance < credits_to_charge:
+                        deficit = credits_to_charge - credit_balance.balance
+                        logger.warning(
+                            f"Insufficient credits: user={user_id}, "
+                            f"required={credits_to_charge}, available={credit_balance.balance}"
+                        )
+                        return CreditChargeErrorResponse(
+                            success=False,
+                            error="insufficient_credits",
+                            user_id=user_id,
+                            required_credits=credits_to_charge,
+                            current_balance=credit_balance.balance,
+                            deficit=deficit
+                        )
+
+                    credit_balance.balance -= credits_to_charge
+                    credit_balance.total_spent += credits_to_charge
+                    balance_after = credit_balance.balance
+
+                    transaction_id = f"txn_{uuid.uuid4().hex[:12]}"
+                    transaction = TransactionService.create_transaction(
+                        transaction_id=transaction_id,
                         user_id=user_id,
-                        balance=0,
-                        total_earned=0,
-                        total_spent=0
+                        transaction_type=TransactionType.CHARGE,
+                        operation_id=operation_id,
+                        cost_usd=cost_usd,
+                        credits=-credits_to_charge,
+                        balance_after=balance_after,
+                        description=description,
+                        meta_info=metadata or {},
+                        db=db
                     )
-                    db.add(credit_balance)
-                    db.flush()
 
-                balance_before = credit_balance.balance
-
-                if credit_balance.balance < credits_to_charge:
-                    deficit = credits_to_charge - credit_balance.balance
-                    logger.warning(
-                        f"Insufficient credits: user={user_id}, "
-                        f"required={credits_to_charge}, available={credit_balance.balance}"
-                    )
-                    db.rollback() 
-                    return CreditChargeErrorResponse(
-                        success=False,
-                        error="insufficient_credits",
-                        user_id=user_id,
-                        required_credits=credits_to_charge,
-                        current_balance=credit_balance.balance,
-                        deficit=deficit
-                    )
-                
-                credit_balance.balance -= credits_to_charge
-                credit_balance.total_spent += credits_to_charge
-                balance_after = credit_balance.balance
-
-                transaction_id = f"txn_{uuid.uuid4().hex[:12]}"
-                transaction = TransactionService.create_transaction(
-                    transaction_id=transaction_id,
-                    user_id=user_id,
-                    transaction_type=TransactionType.CHARGE,
-                    operation_id=operation_id,
-                    cost_usd=cost_usd,
-                    credits=-credits_to_charge,
-                    balance_after=balance_after,
-                    description=description,
-                    metadata=metadata or {},
-                    db=db
-                )
-
-
-            # Disable cache
+            # Invalidate cache after successful transaction
             cache_service.invalidate_balance(user_id)
 
             logger.info(
                 f"Credits charged successfully: user={user_id}, "
                 f"amount={credits_to_charge}, operation={operation_id}"
             )
-            
+
             return CreditChargeResponse(
                 success=True,
                 transaction_id=transaction_id,
@@ -419,13 +415,12 @@ class CreditService:
         """
         from app.services.transaction_service import TransactionService
 
-        # Idempotence check
-        existing_transaction = idempotency_manager.check_operation(operation_id, db)
-
+        # Idempotence check (with user_id to prevent Idempotency Hijacking)
+        existing_transaction = idempotency_manager.check_operation(operation_id, db, user_id=user_id)
 
         if existing_transaction:
             logger.info(f"Idempotent add operation: {operation_id}")
-            purchase_rate = existing_transaction.metadata.get('purchase_rate', 1.0) if existing_transaction.metadata else 1.0
+            purchase_rate = existing_transaction.meta_info.get('purchase_rate', 1.0) if existing_transaction.meta_info else 1.0
             return CreditAddResponse(
                 success=True,
                 transaction_id=existing_transaction.transaction_id,
@@ -504,7 +499,7 @@ class CreditService:
                     credits=credits_to_add,
                     balance_after=balance_after,
                     description=description,
-                    metadata={**(metadata or {}), "source": source, "purchase_rate": purchase_rate},
+                    meta_info={**(metadata or {}), "source": source, "purchase_rate": purchase_rate},
                     db=db
                 )
 

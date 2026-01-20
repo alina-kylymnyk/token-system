@@ -79,7 +79,7 @@
 
 ### Структура проекту
 ```
-credits-system/
+SUBSCRIPTION AND CREDITS SYSTEM/
 ├── app/
 │   ├── api/
 │   │   ├── internal/      # Internal API endpoints
@@ -154,8 +154,13 @@ CREATE DATABASE credits_system;
 docker run --name postgres_credits \
   -e POSTGRES_PASSWORD=postgres123 \
   -e POSTGRES_DB=credits_system \
-  -p 5432:5432 \
+  -p 5433:5432 \
   -d postgres:15
+```
+
+**Або використовуючи docker-compose:**
+```bash
+docker-compose up -d
 ```
 
 ### Крок 5: Налаштування Redis
@@ -169,21 +174,36 @@ docker run --name redis_credits \
 
 ### Крок 6: Налаштування .env
 
-Створіть файл `.env`:
+Створіть файл `.env` (скопіювавши з `.env.example`):
 ```env
 # Database
-DATABASE_URL=postgresql://postgres:postgres123@localhost:5432/credits_system
+DATABASE_HOST=localhost
+DATABASE_PORT=5433
+DATABASE_USER=postgres
+DATABASE_PASSWORD=your-db-password
+DATABASE_NAME=credits_system
 
 # Redis
-REDIS_URL=redis://localhost:6379/0
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
 REDIS_CACHE_TTL=300
 
-# Security
+# Application
+APP_NAME=Credits System API
+DEBUG=True
+API_VERSION=v1
+
+# Security - Service Tokens
 INTERNAL_SERVICE_TOKEN=your-secret-service-token
 ADMIN_TOKEN=your-secret-admin-token
 
-# Application
-DEBUG=True
+# Credits System
+BASE_EXCHANGE_RATE=10000
+CREDITS_PRECISION=0
+
+# Logging
+LOG_LEVEL=INFO
 ```
 
 ### Крок 7: Міграції

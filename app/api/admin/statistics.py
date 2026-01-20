@@ -100,7 +100,7 @@ async def get_statistics(
                 TransactionType.BONUS,
                 TransactionType.REFUND
             ])
-        ).count
+        ).count()
 
         transactions_stats = {
             "total": total_transactions,

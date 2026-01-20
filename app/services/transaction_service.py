@@ -37,7 +37,7 @@ class TransactionService:
         balance_after: int,
         cost_usd: Optional[float] = None,
         description: Optional[str] = None,
-        metadata: Optional[dict] = None,
+        meta_info: Optional[dict] = None,
         db: Session = None
     ) -> Transaction:
         """
@@ -52,7 +52,7 @@ class TransactionService:
         balance_after: Balance after the operation
         cost_usd: Cost in dollars (optional)
         description: Description
-        metadata: Additional data
+        meta_info: Additional data
         db: Database session
 
         Returns:
@@ -67,7 +67,7 @@ class TransactionService:
             credits=credits,
             balance_after=balance_after,
             description=description,
-            metadata=metadata or {}
+            meta_info=meta_info or {}
         )
 
         db.add(transaction)
